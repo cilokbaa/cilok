@@ -9,7 +9,7 @@ const inter = Inter({ subsets: ["latin"] })
 
 // Local JetBrains Mono
 const jetbrainsMono = localFont({
-  src: "./fonts/JetBrainsMono-Regular.woff2",
+  src: "./fonts/jetbrains-mono-latin-400-normal.woff2",
   variable: "--font-mono",
 })
 
