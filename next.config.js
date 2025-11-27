@@ -1,11 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  swcMinify: false,
-  experimental: {
-    swcLoader: true,
-    swcFileReading: true,
-    forceSwcTransforms: false
-  }
+  swcMinify: true,
 };
 
 module.exports = nextConfig;
