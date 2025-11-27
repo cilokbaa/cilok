@@ -1,30 +1,21 @@
-import mongoose from "mongoose";
+import { MongoClient } from "mongodb";
 
-const MONGODB_URI = process.env.MONGODB_URI!;
+const uri = process.env.MONGODB_URI!;
+let client;
+let clientPromise: Promise<MongoClient>;
 
-if (!MONGODB_URI) {
-  throw new Error("❌ MONGODB_URI is missing in environment variables");
+declare global {
+  var _mongoClientPromise: Promise<MongoClient> | undefined;
 }
 
-// Cache connection agar tidak reconnect tiap request
-let cached = global.mongoose;
-
-if (!cached) {
-  cached = global.mongoose = { conn: null, promise: null };
+if (!global._mongoClientPromise) {
+  client = new MongoClient(uri);
+  global._mongoClientPromise = client.connect();
 }
 
-export async function connectDB() {
-  if (cached.conn) return cached.conn;
+clientPromise = global._mongoClientPromise;
 
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
-      bufferCommands: false
-    }).then((mongoose) => {
-      console.log("🔥 Mongo Connected");
-      return mongoose;
-    });
-  }
-
-  cached.conn = await cached.promise;
-  return cached.conn;
+export async function getDB() {
+  const client = await clientPromise;
+  return client.db("main"); // nama database, bebas mau diganti
 }
