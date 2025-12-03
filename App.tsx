@@ -2,10 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { HashRouter as Router, Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from "firebase/firestore";
-import { auth } from './lib/firebase';
-import { db } from './lib/firebase';
+import { auth, db } from './lib/firebase';
 
-// Pages + Components
 import { Layout } from './components/Layout';
 import { AdminSidebar } from './components/AdminSidebar';
 import { Home } from './pages/Home';
@@ -21,7 +19,7 @@ import { Privacy } from './pages/Privacy';
 import ScrollToTop from './components/ScrollToTop';
 import { Maintenance } from "./pages/Maintenance";
 
-// 🔒 Protected admin route
+// 🔒 ADMIN ROUTE WITH CUSTOM CLAIM CHECK
 const ProtectedAdminRoute = () => {
   const [authStatus, setAuthStatus] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
 
@@ -30,13 +28,7 @@ const ProtectedAdminRoute = () => {
       if (!user) return setAuthStatus("unauthorized");
 
       const token = await user.getIdTokenResult(true);
-
-      if (token.claims.admin === true) {
-        setAuthStatus("authorized");
-      } else {
-        await auth.signOut();
-        setAuthStatus("unauthorized");
-      }
+      setAuthStatus(token.claims.admin === true ? "authorized" : "unauthorized");
     });
 
     return () => unsub();
@@ -59,93 +51,43 @@ const ProtectedAdminRoute = () => {
 };
 
 function App() {
-  const [isMaintenance, setIsMaintenance] = useState(false);
-  const [maintenanceMsg, setMaintenanceMsg] = useState("");
+  const [maintenance, setMaintenance] = useState(false);
+  const [message, setMessage] = useState("");
+  const [isAdmin, setIsAdmin] = useState(false);
 
+  // CEK ADMIN DARI TOKEN
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "config", "maintenance"), (snap) => {
-      if (snap.exists()) {
-        setIsMaintenance(snap.data().enabled);
-        setMaintenanceMsg(snap.data().message || "");
-      }
+    const unsub = onAuthStateChanged(auth, async (user) => {
+      if (!user) return setIsAdmin(false);
+      const token = await user.getIdTokenResult(true);
+      setIsAdmin(token.claims.admin === true);
     });
-
     return () => unsub();
   }, []);
 
-  const isAdmin = window.location.hash.startsWith("#/admin");
-
-  // Jika maintenance ON → arahkan semua ke page maintenance, kecuali admin
-  if (isMaintenance && !isAdmin) {
-    return <Maintenance message={maintenanceMsg} />;
-  }
-
-  return (
-    <Router>
-      <ScrollToTop />
-      <Routes>
-
-        {/* Public */}
-        <Route path="/" element={<Layout><Home /></Layout>} />
-        <Route path="/scripts" element={<Layout><ScriptList /></Layout>} />
-        <Route path="/script/:id" element={<Layout><ScriptDetail /></Layout>} />
-        <Route path="/disclaimer" element={<Layout><Disclaimer /></Layout>} />
-        <Route path="/terms" element={<Layout><Terms /></Layout>} />
-        <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
-
-        {/* Admin Login */}
-        <Route path="/admin/login" element={<Layout><AdminLogin /></Layout>} />
-
-        {/* Admin Panel */}
-        <Route path="/admin" element={<ProtectedAdminRoute />}>
-          <Route index element={<Navigate to="/admin/dashboard" replace />} />
-          <Route path="dashboard" element={<Dashboard />} />
-          <Route path="scripts" element={<ManageScripts />} />
-          <Route path="upload" element={<ScriptEditor />} />
-          <Route path="edit/:id" element={<ScriptEditor />} />
-        </Route>
-
-      </Routes>
-    </Router>
-  );
-}
-
-export default App;        }
-      } catch (err) {
-        console.error('Error checking admin claim:', err);
-        setAuthStatus('unauthorized');
+  // REALTIME MAINTENANCE
+  useEffect(() => {
+    const unsub = onSnapshot(doc(db, "config", "maintenance"), (snap) => {
+      if (snap.exists()) {
+        const data = snap.data();
+        setMaintenance(Boolean(data.enabled));
+        setMessage(data.message || "");
       }
     });
-
-    return () => unsubscribe();
+    return () => unsub();
   }, []);
 
-  if (authStatus === 'loading') {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="w-8 h-8 border-4 border-gray-200 border-t-accent-500 rounded-full animate-spin" />
-      </div>
-    );
+  // Jika maintenance ON & bukan admin → tampilkan halaman maintenance
+  if (maintenance && !isAdmin) {
+    return <Maintenance message={message} />;
   }
 
-  return authStatus === 'authorized' ? (
-    <div className="flex min-h-screen bg-gray-50">
-      <AdminSidebar />
-      <div className="flex-1 md:ml-64 p-8 overflow-y-auto">
-        <Outlet />
-      </div>
-    </div>
-  ) : (
-    <Navigate to="/admin/login" replace />
-  );
-};
-
-function App() {
   return (
     <Router>
       <ScrollToTop />
       <Routes>
-        {/* Public Routes */}
+
+        {/* PUBLIC ROUTES */}
         <Route path="/" element={<Layout><Home /></Layout>} />
         <Route path="/scripts" element={<Layout><ScriptList /></Layout>} />
         <Route path="/script/:id" element={<Layout><ScriptDetail /></Layout>} />
@@ -153,10 +95,10 @@ function App() {
         <Route path="/terms" element={<Layout><Terms /></Layout>} />
         <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
 
-        {/* Admin Login */}
+        {/* ADMIN LOGIN */}
         <Route path="/admin/login" element={<Layout><AdminLogin /></Layout>} />
 
-        {/* Protected Admin Routes */}
+        {/* ADMIN */}
         <Route path="/admin" element={<ProtectedAdminRoute />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
@@ -164,6 +106,7 @@ function App() {
           <Route path="upload" element={<ScriptEditor />} />
           <Route path="edit/:id" element={<ScriptEditor />} />
         </Route>
+
       </Routes>
     </Router>
   );
