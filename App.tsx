@@ -4,8 +4,10 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { doc, onSnapshot } from "firebase/firestore";
 import { auth, db } from './lib/firebase';
 
+import ScrollToTop from './components/ScrollToTop';
 import { Layout } from './components/Layout';
 import { AdminSidebar } from './components/AdminSidebar';
+
 import { Home } from './pages/Home';
 import { ScriptList } from './pages/ScriptList';
 import { ScriptDetail } from './pages/ScriptDetail';
@@ -16,10 +18,11 @@ import { ScriptEditor } from './pages/admin/ScriptEditor';
 import { Disclaimer } from './pages/Disclaimer';
 import { Terms } from './pages/Terms';
 import { Privacy } from './pages/Privacy';
-import ScrollToTop from './components/ScrollToTop';
 import { Maintenance } from "./pages/Maintenance";
 
-// 🔒 ADMIN ROUTE WITH CUSTOM CLAIM CHECK
+// =========================
+//     ADMIN ROUTE GUARD
+// =========================
 const ProtectedAdminRoute = () => {
   const [authStatus, setAuthStatus] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
 
@@ -50,42 +53,33 @@ const ProtectedAdminRoute = () => {
   );
 };
 
+// =========================
+//         APP
+// =========================
 function App() {
   const [maintenance, setMaintenance] = useState(false);
-  const [message, setMessage] = useState("");
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [maintenanceMsg, setMaintenanceMsg] = useState("");
 
-  // CEK ADMIN DARI TOKEN
-  useEffect(() => {
-    const unsub = onAuthStateChanged(auth, async (user) => {
-      if (!user) return setIsAdmin(false);
-      const token = await user.getIdTokenResult(true);
-      setIsAdmin(token.claims.admin === true);
-    });
-    return () => unsub();
-  }, []);
-
-  // REALTIME MAINTENANCE
   useEffect(() => {
     const unsub = onSnapshot(doc(db, "config", "maintenance"), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setMaintenance(Boolean(data.enabled));
-        setMessage(data.message || "");
+        setMaintenanceMsg(data.message || "");
       }
     });
     return () => unsub();
   }, []);
 
-  // Jika maintenance ON & bukan admin → tampilkan halaman maintenance
-  if (maintenance && !isAdmin) {
-    return <Maintenance message={message} />;
-  }
-
   return (
     <Router>
       <ScrollToTop />
       <Routes>
+
+        {/* MAINTENANCE ROUTE */}
+        {maintenance && (
+          <Route path="*" element={<Maintenance message={maintenanceMsg} />} />
+        )}
 
         {/* PUBLIC ROUTES */}
         <Route path="/" element={<Layout><Home /></Layout>} />
@@ -98,7 +92,7 @@ function App() {
         {/* ADMIN LOGIN */}
         <Route path="/admin/login" element={<Layout><AdminLogin /></Layout>} />
 
-        {/* ADMIN */}
+        {/* ADMIN PROTECTED */}
         <Route path="/admin" element={<ProtectedAdminRoute />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
