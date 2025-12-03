@@ -21,7 +21,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             <Link to="/" className="flex items-center gap-3 group">
               {/* REPLACE THE URL BELOW WITH YOUR LOGO IMAGE LINK */}
               <img 
-                src="https://placehold.co/40x40/4ade80/ffffff?text=SV" 
+                src="https://aipicres.com/remove-bg/20251203/7873d7f9-a005-4ae1-8379-effdbce5c2fe.png" 
                 alt="Logo" 
                 className="h-10 w-10 rounded-xl object-cover shadow-sm group-hover:shadow-green-200 group-hover:scale-105 transition-all duration-300"
               />
