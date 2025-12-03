@@ -1,107 +1,141 @@
-import React, { useEffect, useState } from 'react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts';
-import { getAnalyticsSummary } from '../../services/scriptService';
-import { AnalyticsSummary } from '../../types';
-import { MousePointer2, Eye, FileText } from 'lucide-react';
-
-// Mock data for charts (since we don't have historical data in this simple schema)
-const mockChartData = [
-  { name: 'Mon', views: 400, clicks: 240 },
-  { name: 'Tue', views: 300, clicks: 139 },
-  { name: 'Wed', views: 200, clicks: 980 },
-  { name: 'Thu', views: 278, clicks: 390 },
-  { name: 'Fri', views: 189, clicks: 480 },
-  { name: 'Sat', views: 239, clicks: 380 },
-  { name: 'Sun', views: 349, clicks: 430 },
-];
+import React, { useEffect, useState } from "react";
+import { collection, getDocs } from "firebase/firestore";
+import { db } from "../../lib/firebase";
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  ResponsiveContainer,
+} from "recharts";
 
 export const Dashboard: React.FC = () => {
-  const [summary, setSummary] = useState<AnalyticsSummary | null>(null);
+  const [totalScripts, setTotalScripts] = useState(0);
+  const [totalViews, setTotalViews] = useState(0);
+  const [totalClicks, setTotalClicks] = useState(0);
+  const [totalSearches, setTotalSearches] = useState(0);
+  const [dailyData, setDailyData] = useState([]);
 
   useEffect(() => {
-    const load = async () => {
-      const data = await getAnalyticsSummary();
-      setSummary(data);
+    const fetchStats = async () => {
+      const scriptsRef = collection(db, "scripts");
+      const snapshot = await getDocs(scriptsRef);
+
+      let views = 0;
+      let clicks = 0;
+      let searches = 0;
+      let createdMap: any = {};
+
+      snapshot.forEach((doc) => {
+        const data: any = doc.data();
+        views += data.views || 0;
+        clicks += data.clicks || 0;
+        searches += data.searches || 0;
+
+        // hitung jumlah upload per hari (buat bar chart)
+        if (data.createdAt?.seconds) {
+          const date = new Date(data.createdAt.seconds * 1000);
+          const day = date.toISOString().split("T")[0]; // YYYY-MM-DD
+
+          if (!createdMap[day]) createdMap[day] = 0;
+          createdMap[day] += 1;
+        }
+      });
+
+      // convert map → array buat chart
+      const formatted = Object.keys(createdMap)
+        .sort()
+        .slice(-7) // ambil 7 hari terakhir
+        .map((day) => ({
+          day,
+          uploads: createdMap[day],
+        }));
+
+      setTotalScripts(snapshot.size);
+      setTotalViews(views);
+      setTotalClicks(clicks);
+      setTotalSearches(searches);
+      setDailyData(formatted);
     };
-    load();
+
+    fetchStats();
   }, []);
 
-  const StatCard = ({ title, value, icon: Icon, color }: any) => (
-    <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex items-center justify-between">
-      <div>
-        <p className="text-sm font-medium text-gray-500 mb-1">{title}</p>
-        <h3 className="text-3xl font-bold text-gray-900">{value}</h3>
-      </div>
-      <div className={`p-3 rounded-2xl ${color}`}>
-        <Icon size={24} className="text-white" />
-      </div>
-    </div>
-  );
+  const pieData = [
+    { name: "Views", value: totalViews },
+    { name: "Clicks", value: totalClicks },
+    { name: "Searches", value: totalSearches },
+  ];
+
+  const COLORS = ["#22c55e", "#3b82f6", "#eab308"];
 
   return (
-    <div className="space-y-8">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
-        <p className="text-gray-500">Welcome back. Here's what's happening.</p>
-      </div>
+    <div>
+      <h1 className="text-3xl font-semibold mb-6">Dashboard</h1>
 
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <StatCard 
-            title="Total Scripts" 
-            value={summary?.totalScripts || 0} 
-            icon={FileText} 
-            color="bg-blue-500" 
-        />
-        <StatCard 
-            title="Total Views" 
-            value={summary?.totalViews || 0} 
-            icon={Eye} 
-            color="bg-accent-500" 
-        />
-        <StatCard 
-            title="Total Clicks" 
-            value={summary?.totalClicks || 0} 
-            icon={MousePointer2} 
-            color="bg-purple-500" 
-        />
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-10">
+        <div className="p-6 bg-white rounded-xl shadow">
+          <h2 className="text-gray-600">Total Scripts</h2>
+          <p className="text-3xl font-bold">{totalScripts}</p>
+        </div>
+        <div className="p-6 bg-white rounded-xl shadow">
+          <h2 className="text-gray-600">Total Views</h2>
+          <p className="text-3xl font-bold">{totalViews}</p>
+        </div>
+        <div className="p-6 bg-white rounded-xl shadow">
+          <h2 className="text-gray-600">Total Clicks</h2>
+          <p className="text-3xl font-bold">{totalClicks}</p>
+        </div>
+        <div className="p-6 bg-white rounded-xl shadow">
+          <h2 className="text-gray-600">Total Searches</h2>
+          <p className="text-3xl font-bold">{totalSearches}</p>
+        </div>
       </div>
 
       {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6">Traffic Overview</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={mockChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <Tooltip 
-                    contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
-                />
-                <Line type="monotone" dataKey="views" stroke="#4ade80" strokeWidth={3} dot={false} activeDot={{r: 6}} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+
+        {/* Pie Chart */}
+        <div className="bg-white p-6 rounded-xl shadow">
+          <h2 className="text-xl font-semibold mb-4">Engagement Comparison</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <PieChart>
+              <Pie
+                data={pieData}
+                dataKey="value"
+                nameKey="name"
+                cx="50%"
+                cy="50%"
+                outerRadius={100}
+                label
+              >
+                {pieData.map((_entry, index) => (
+                  <Cell key={index} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
         </div>
 
-        <div className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6">Engagement</h3>
-          <div className="h-72">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={mockChartData}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f3f4f6" />
-                <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <YAxis axisLine={false} tickLine={false} tick={{fill: '#9ca3af', fontSize: 12}} />
-                <Tooltip 
-                     cursor={{fill: '#f9fafb'}}
-                     contentStyle={{borderRadius: '12px', border: 'none', boxShadow: '0 4px 6px -1px rgb(0 0 0 / 0.1)'}} 
-                />
-                <Bar dataKey="clicks" fill="#22c55e" radius={[6, 6, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+        {/* Bar Chart */}
+        <div className="bg-white p-6 rounded-xl shadow">
+          <h2 className="text-xl font-semibold mb-4">Scripts Uploaded (Last 7 Days)</h2>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={dailyData}>
+              <XAxis dataKey="day" />
+              <YAxis allowDecimals={false} />
+              <Tooltip />
+              <Bar dataKey="uploads" fill="#22c55e" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       </div>
     </div>
