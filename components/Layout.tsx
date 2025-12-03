@@ -105,7 +105,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
                <div className="bg-gray-900 text-white p-1 rounded shadow-sm">
                   <ShieldCheck size={16} strokeWidth={2.5} />
                 </div>
-              <p className="text-sm text-gray-500">© 2024 ScriptBinary. All rights reserved.</p>
+              <p className="text-sm text-gray-500">© 2025 ScriptBinary. All rights reserved.</p>
             </div>
             
             <div className="flex flex-wrap justify-center gap-x-8 gap-y-2">
