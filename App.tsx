@@ -20,16 +20,14 @@ import { Terms } from './pages/Terms';
 import { Privacy } from './pages/Privacy';
 import { Maintenance } from "./pages/Maintenance";
 
-// =========================
-//     ADMIN ROUTE GUARD
-// =========================
+
+// ADMIN ROUTE PROTECTOR
 const ProtectedAdminRoute = () => {
   const [authStatus, setAuthStatus] = useState<'loading' | 'authorized' | 'unauthorized'>('loading');
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, async (user) => {
       if (!user) return setAuthStatus("unauthorized");
-
       const token = await user.getIdTokenResult(true);
       setAuthStatus(token.claims.admin === true ? "authorized" : "unauthorized");
     });
@@ -53,22 +51,29 @@ const ProtectedAdminRoute = () => {
   );
 };
 
-// =========================
-//         APP
-// =========================
+
+// WRAPPER — hanya untuk public routes
+const PublicRoutes = ({ maintenance, message }: any) => {
+  if (maintenance) {
+    return <Maintenance message={message} />;
+  }
+  return <Outlet />;
+};
+
+
 function App() {
   const [maintenance, setMaintenance] = useState(false);
-  const [maintenanceMsg, setMaintenanceMsg] = useState("");
+  const [message, setMessage] = useState("");
 
+  // realtime maintenance listener
   useEffect(() => {
-    const unsub = onSnapshot(doc(db, "config", "maintenance"), (snap) => {
+    return onSnapshot(doc(db, "config", "maintenance"), (snap) => {
       if (snap.exists()) {
         const data = snap.data();
         setMaintenance(Boolean(data.enabled));
-        setMaintenanceMsg(data.message || "");
+        setMessage(data.message || "");
       }
     });
-    return () => unsub();
   }, []);
 
   return (
@@ -76,23 +81,20 @@ function App() {
       <ScrollToTop />
       <Routes>
 
-        {/* MAINTENANCE ROUTE */}
-        {maintenance && (
-          <Route path="*" element={<Maintenance message={maintenanceMsg} />} />
-        )}
-
-        {/* PUBLIC ROUTES */}
-        <Route path="/" element={<Layout><Home /></Layout>} />
-        <Route path="/scripts" element={<Layout><ScriptList /></Layout>} />
-        <Route path="/script/:id" element={<Layout><ScriptDetail /></Layout>} />
-        <Route path="/disclaimer" element={<Layout><Disclaimer /></Layout>} />
-        <Route path="/terms" element={<Layout><Terms /></Layout>} />
-        <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
+        {/* WRAPPER UNTUK PUBLIC ROUTES */}
+        <Route element={<PublicRoutes maintenance={maintenance} message={message} />}>
+          <Route path="/" element={<Layout><Home /></Layout>} />
+          <Route path="/scripts" element={<Layout><ScriptList /></Layout>} />
+          <Route path="/script/:id" element={<Layout><ScriptDetail /></Layout>} />
+          <Route path="/disclaimer" element={<Layout><Disclaimer /></Layout>} />
+          <Route path="/terms" element={<Layout><Terms /></Layout>} />
+          <Route path="/privacy" element={<Layout><Privacy /></Layout>} />
+        </Route>
 
         {/* ADMIN LOGIN */}
         <Route path="/admin/login" element={<Layout><AdminLogin /></Layout>} />
 
-        {/* ADMIN PROTECTED */}
+        {/* ADMIN ROUTES */}
         <Route path="/admin" element={<ProtectedAdminRoute />}>
           <Route index element={<Navigate to="/admin/dashboard" replace />} />
           <Route path="dashboard" element={<Dashboard />} />
@@ -100,6 +102,9 @@ function App() {
           <Route path="upload" element={<ScriptEditor />} />
           <Route path="edit/:id" element={<ScriptEditor />} />
         </Route>
+
+        {/* 404 fallback */}
+        <Route path="*" element={<Navigate to="/" replace />} />
 
       </Routes>
     </Router>
